@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>保定学院 · 校园导览</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif}
+#map{width:100%;height:100%}
+
+/* Top bar */
+.topbar{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  background:linear-gradient(180deg,rgba(0,0,0,.55),transparent);
+  padding:max(12px,env(safe-area-inset-top,12px)) 16px 20px;
+  display:flex;align-items:flex-start;gap:10px;flex-direction:column;
+}
+.topbar h1{font-size:17px;color:#fff;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,.4)}
+.topbar .sub{font-size:11px;color:rgba(255,255,255,.75);font-weight:400}
+
+/* Search bar */
+.search-bar{
+  position:fixed;top:105px;left:16px;right:16px;z-index:100;
+  display:flex;gap:8px;
+}
+.search-bar input{
+  flex:1;height:38px;border-radius:10px;border:none;
+  padding:0 14px;font-size:13px;background:rgba(255,255,255,.95);
+  box-shadow:0 2px 10px rgba(0,0,0,.12);outline:none;
+}
+.search-bar button{
+  height:38px;padding:0 16px;border-radius:10px;border:none;
+  background:#1677ff;color:#fff;font-size:12px;font-weight:700;
+  cursor:pointer;white-space:nowrap;
+}
+.search-bar button:active{opacity:.85}
+
+/* Category tabs */
+.cats{
+  position:fixed;top:152px;left:0;right:0;z-index:99;
+  display:flex;gap:6px;padding:0 16px;overflow-x:auto;
+  scrollbar-width:none;-ms-overflow-style:none;
+}
+.cats::-webkit-scrollbar{display:none}
+.cat{
+  flex-shrink:0;padding:7px 14px;border-radius:20px;
+  font-size:12px;font-weight:600;border:none;cursor:pointer;
+  background:rgba(255,255,255,.92);color:#333;
+  box-shadow:0 2px 8px rgba(0,0,0,.1);transition:all .2s;
+  white-space:nowrap;
+}
+.cat.active{background:#1677ff;color:#fff}
+.cat:active{transform:scale(.95)}
+
+/* Bottom sheet */
+.sheet{
+  position:fixed;bottom:20px;left:10px;right:10px;z-index:99;
+  background:rgba(255,255,255,.96);border-radius:14px;
+  box-shadow:0 -2px 20px rgba(0,0,0,.12);
+  padding:14px 16px;max-height:42vh;overflow-y:auto;
+  transition:transform .3s ease;
+}
+.sheet.hidden{transform:translateY(120%)}
+.sheet h3{font-size:15px;font-weight:700;margin-bottom:10px;color:#1a1a1a}
+.list-item{
+  display:flex;align-items:center;gap:10px;padding:10px 8px;
+  border-radius:10px;cursor:pointer;transition:background .15s;
+  border-bottom:1px solid #f0f0f0;
+}
+.list-item:last-child{border-bottom:none}
+.list-item:active{background:#f5f5f5}
+.list-icon{
+  width:36px;height:36px;border-radius:10px;display:flex;
+  align-items:center;justify-content:center;font-size:18px;flex-shrink:0;
+}
+.list-info{flex:1;min-width:0}
+.list-info .name{font-size:13px;font-weight:600;color:#1a1a1a}
+.list-info .desc{font-size:11px;color:#999;margin-top:2px}
+.list-arrow{color:#ccc;font-size:16px}
+
+/* Action buttons */
+.actions{
+  position:fixed;bottom:24px;right:16px;z-index:101;
+  display:flex;flex-direction:column;gap:8px;
+}
+.act-btn{
+  width:42px;height:42px;border-radius:50%;
+  background:#1677ff;color:#fff;border:none;cursor:pointer;
+  font-size:18px;box-shadow:0 4px 14px rgba(22,119,255,.4);
+  display:flex;align-items:center;justify-content:center;
+  transition:transform .2s;
+}
+.act-btn:active{transform:scale(.9)}
+.act-btn.route{background:#52c41a;box-shadow:0 4px 14px rgba(82,196,26,.4)}
+
+/* Route panel */
+.route-panel{
+  position:fixed;bottom:0;left:0;right:0;z-index:200;
+  background:#fff;border-radius:16px 16px 0 0;
+  box-shadow:0 -4px 24px rgba(0,0,0,.15);
+  padding:20px 16px 24px;max-height:55vh;overflow-y:auto;
+  transform:translateY(100%);transition:transform .3s ease;
+}
+.route-panel.show{transform:translateY(0)}
+.route-panel h3{font-size:15px;font-weight:700;margin-bottom:14px}
+.route-panel .field{margin-bottom:12px}
+.route-panel .field label{font-size:12px;color:#666;display:block;margin-bottom:4px}
+.route-panel .field input{
+  width:100%;height:38px;border:1.5px solid #e0e0e0;border-radius:8px;
+  padding:0 12px;font-size:13px;outline:none;
+}
+.route-panel .field input:focus{border-color:#1677ff}
+.route-panel .btns{display:flex;gap:8px;margin-top:16px}
+.route-panel .btns button{
+  flex:1;height:40px;border-radius:8px;border:none;
+  font-size:13px;font-weight:700;cursor:pointer;
+}
+.route-panel .btns .btn-go{background:#1677ff;color:#fff}
+.route-panel .btns .btn-cancel{background:#f5f5f5;color:#666}
+.route-result{font-size:13px;color:#333;line-height:1.8;margin-top:14px}
+.route-result .step{padding:8px 0;border-bottom:1px solid #f0f0f0}
+.route-result .step:last-child{border:none}
+.route-result .icon{font-size:18px;margin-right:8px}
+
+/* Overlay */
+.overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:150;
+  display:none;
+}
+.overlay.show{display:block}
+
+/* Loading */
+.loading{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:rgba(0,0,0,.75);color:#fff;padding:12px 24px;
+  border-radius:8px;font-size:14px;z-index:300;display:none;
+}
+
+/* Disclaimer */
+.disclaimer{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:#fff;border-radius:14px;padding:24px 20px 20px;
+  z-index:200;max-width:300px;width:90%;text-align:center;
+  box-shadow:0 8px 40px rgba(0,0,0,.2);
+}
+.disclaimer h3{font-size:15px;margin-bottom:8px}
+.disclaimer p{font-size:12px;color:#666;line-height:1.6;margin-bottom:14px}
+.disclaimer button{
+  width:100%;padding:10px;border-radius:8px;border:none;
+  background:#1677ff;color:#fff;font-size:14px;font-weight:700;cursor:pointer;
+}
+</style>
+</head>
+<body>
+
+<div class="disclaimer" id="disclaimer">
+  <h3>校园导览 · 温馨提示</h3>
+  <p>本页面为新生入学辅助工具，标注信息仅供参考。数据来源于公开资料，请以实际校园路标为准。</p>
+  <button onclick="document.getElementById('disclaimer').remove()">我知道了</button>
+</div>
+
+<div class="topbar">
+  <h1>保定学院</h1>
+  <div class="sub">📍 河北省保定市莲池区七一东路3027号</div>
+</div>
+
+<div class="search-bar">
+  <input type="text" id="searchInput" placeholder="搜索校内地点 / AI 智能搜索">
+  <button onclick="doSearch()">🔍 搜索</button>
+</div>
+
+<div class="cats" id="cats"></div>
+<div class="overlay" id="overlay"></div>
+<div id="map"></div>
+
+<div class="actions">
+  <button class="act-btn route" id="routeBtn" title="路线规划">🧭</button>
+  <button class="act-btn" id="toggleBtn" title="地点列表">☰</button>
+</div>
+
+<div class="sheet" id="sheet">
+  <h3>校内地点导航</h3>
+  <div id="list"></div>
+</div>
+
+<div class="route-panel" id="routePanel">
+  <h3>🧭 路线规划</h3>
+  <div class="field">
+    <label>起点</label>
+    <input type="text" id="fromInput" placeholder="从哪里出发">
+  </div>
+  <div class="field">
+    <label>终点</label>
+    <input type="text" id="toInput" placeholder="要去哪里">
+  </div>
+  <div class="btns">
+    <button class="btn-cancel" onclick="closeRoute()">取消</button>
+    <button class="btn-go" onclick="doRoute()">开始规划</button>
+  </div>
+  <div class="route-result" id="routeResult"></div>
+</div>
+
+<div class="loading" id="loading">加载中...</div>
+
+<script>
+// ===== 数据 =====
+var CENTER = {lng: 115.578285, lat: 38.880309};
+
+var CATEGORIES = [
+  {key:'all',label:'全部'},
+  {key:'teach',label:'🏫 教学楼'},
+  {key:'dorm',label:'🏠 宿舍'},
+  {key:'food',label:'🍜 食堂'},
+  {key:'lib',label:'📚 图书馆'},
+  {key:'sport',label:'⚽ 运动'},
+  {key:'other',label:'📍 其他'}
+];
+
+var PLACES = [
+  {name:'A座教学楼',cat:'teach',lng:115.5777,lat:38.8805,icon:'🏫',desc:'回信石旁，文科楼'},
+  {name:'B座教学楼',cat:'teach',lng:115.5779,lat:38.8806,icon:'🏫',desc:'回信石旁，理科楼'},
+  {name:'C座教学楼',cat:'teach',lng:115.5780,lat:38.8805,icon:'🏫',desc:'B座北侧'},
+  {name:'D座教学楼',cat:'teach',lng:115.5785,lat:38.8812,icon:'🏫',desc:'图书馆东侧'},
+  {name:'E座教学楼',cat:'teach',lng:115.5788,lat:38.8813,icon:'🏫',desc:'图书馆东北侧'},
+  {name:'F座教学楼',cat:'teach',lng:115.5775,lat:38.8807,icon:'🏫',desc:'A座北侧'},
+  {name:'G座教学楼',cat:'teach',lng:115.5773,lat:38.8808,icon:'🏫',desc:'F座北侧'},
+  {name:'J座教学楼',cat:'teach',lng:115.5793,lat:38.8810,icon:'🏫',desc:'东侧教学楼'},
+  {name:'综合楼',cat:'teach',lng:115.5776,lat:38.8803,icon:'🏫',desc:'校门旁主教学楼'},
+  {name:'实训大楼',cat:'teach',lng:115.5783,lat:38.8815,icon:'🔬',desc:'实验实训中心'},
+  {name:'1号宿舍楼',cat:'dorm',lng:115.5790,lat:38.8818,icon:'🏠',desc:'北区宿舍'},
+  {name:'2号宿舍楼',cat:'dorm',lng:115.5788,lat:38.8819,icon:'🏠',desc:'北区宿舍'},
+  {name:'3号宿舍楼',cat:'dorm',lng:115.5785,lat:38.8820,icon:'🏠',desc:'北区宿舍'},
+  {name:'4号宿舍楼',cat:'dorm',lng:115.5793,lat:38.8818,icon:'🏠',desc:'东北区宿舍'},
+  {name:'5号宿舍楼',cat:'dorm',lng:115.5795,lat:38.8819,icon:'🏠',desc:'东区宿舍'},
+  {name:'6号宿舍楼',cat:'dorm',lng:115.5798,lat:38.8817,icon:'🏠',desc:'东区宿舍，近体育场'},
+  {name:'国培公寓',cat:'dorm',lng:115.5788,lat:38.8822,icon:'🏠',desc:'接待中心/培训住宿'},
+  {name:'第一餐厅',cat:'food',lng:115.5786,lat:38.8818,icon:'🍜',desc:'网红打卡食堂，种类丰富'},
+  {name:'第二餐厅',cat:'food',lng:115.5783,lat:38.8819,icon:'🍜',desc:'早餐种类多，近北区宿舍'},
+  {name:'回民餐厅',cat:'food',lng:115.5781,lat:38.8820,icon:'🍜',desc:'兰州拉面、烤鸭饭等'},
+  {name:'如意厅',cat:'food',lng:115.5789,lat:38.8820,icon:'🍜',desc:'锅盔煎饼、旋转小火锅'},
+  {name:'图书馆',cat:'lib',lng:115.5784,lat:38.8810,icon:'📚',desc:'学校地标建筑，学习中心'},
+  {name:'畿辅文化会堂',cat:'lib',lng:115.5782,lat:38.8811,icon:'🎤',desc:'学术会议/讲座场所'},
+  {name:'体育场',cat:'sport',lng:115.5802,lat:38.8816,icon:'⚽',desc:'田径场/足球场，晨练好去处'},
+  {name:'篮球场',cat:'sport',lng:115.5800,lat:38.8820,icon:'🏀',desc:'东区篮球场地'},
+  {name:'体育馆',cat:'sport',lng:115.5795,lat:38.8812,icon:'🏟️',desc:'室内运动场馆'},
+  {name:'校门（南门）',cat:'other',lng:115.5778,lat:38.8798,icon:'🚪',desc:'学校正门，七一东路'},
+  {name:'回信石',cat:'other',lng:115.5778,lat:38.8802,icon:'🪨',desc:'习近平总书记回信纪念石'},
+  {name:'校训石',cat:'other',lng:115.5781,lat:38.8807,icon:'🪨',desc:'师昌绪院士题写校训'},
+  {name:'老校门',cat:'other',lng:115.5780,lat:38.8809,icon:'🏛️',desc:'红二师老校门复刻版'},
+  {name:'红色长廊',cat:'other',lng:115.5782,lat:38.8809,icon:'🔴',desc:'校园文化景观廊道'},
+  {name:'师魂石',cat:'other',lng:115.5784,lat:38.8816,icon:'🪨',desc:'图书馆北侧'},
+  {name:'校医院',cat:'other',lng:115.5789,lat:38.8823,icon:'🏥',desc:'北区，近国培公寓'},
+  {name:'行政楼',cat:'other',lng:115.5779,lat:38.8804,icon:'🏢',desc:'学校行政办公'}
+];
+
+// ===== 初始化 =====
+var map, activeCat='all', markers=[], markerMap={};
+
+function loadBMap(callback){
+  var script=document.createElement('script');
+  script.src='https://api.map.baidu.com/api?v=3.0&ak=sk-ap-QpL0LgQsPDFFbTQP3c68kqbiJ1XRNC2BqLbFoEeAis872kUuLAS02j5KUducRN8U&callback=onBMapLoaded';
+  window.onBMapLoaded=callback;
+  document.head.appendChild(script);
+}
+
+function init(){
+  map=new BMap.Map('map',{enableMapClick:false});
+  map.centerAndZoom(new BMap.Point(CENTER.lng,CENTER.lat),16);
+  map.enableScrollWheelZoom(true);
+  map.setMapStyleV2({styleId:'64c7c59f7de90f8ce8ee28a0bd35a4df'});
+
+  var overlay=new BMap.Polygon([
+    new BMap.Point(115.5770,38.8796),
+    new BMap.Point(115.5810,38.8796),
+    new BMap.Point(115.5810,38.8826),
+    new BMap.Point(115.5770,38.8826)
+  ],{strokeColor:'#1677ff',strokeWeight:2,strokeOpacity:.3,fillColor:'#1677ff',fillOpacity:.05});
+  map.addOverlay(overlay);
+  map.addControl(new BMap.NavigationControl({anchor:BMAP_ANCHOR_BOTTOM_LEFT}));
+
+  renderMarkers();
+  renderCats();
+  renderList();
+  bindEvents();
+}
+
+function createMarker(p){
+  var pt=new BMap.Point(p.lng,p.lat);
+  var m=new BMap.Marker(pt);
+  m.addEventListener('click',function(){
+    var info='<div style="padding:6px 2px;min-width:140px"><b style="font-size:13px">'+p.icon+' '+p.name+'</b><br><span style="font-size:11px;color:#666">'+p.desc+'</span></div>';
+    map.openInfoWindow(new BMap.InfoWindow(info,{width:180}),pt);
+    try{navigator.vibrate&&navigator.vibrate(8)}catch(e){}
+  });
+  return m;
+}
+
+function renderMarkers(cat){
+  cat=cat||activeCat;
+  markers.forEach(function(m){map.removeOverlay(m)});
+  markers=[];markerMap={};
+
+  var filtered=cat==='all'?PLACES:PLACES.filter(function(p){return p.cat===cat});
+  filtered.forEach(function(p){
+    var pt=new BMap.Point(p.lng,p.lat);
+    var label=new BMap.Label(
+      '<div style="background:#fff;border-radius:8px;padding:3px 8px;font-size:11px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.15);white-space:nowrap;border:1.5px solid #1677ff;color:#1677ff">'+p.icon+' '+p.name+'</div>',
+      {offset:new BMap.Size(0,-15),position:pt}
+    );
+    label.setStyle({border:'none',background:'transparent'});
+    map.addOverlay(label);
+    var m=createMarker(p);
+    map.addOverlay(m);
+    markers.push(m);
+    markerMap[p.name]=p;
+  });
+}
+
+function renderCats(){
+  var html='';
+  CATEGORIES.forEach(function(c){
+    html+='<button class="cat'+(c.key===activeCat?' active':'')+'" data-cat="'+c.key+'">'+c.label+'</button>';
+  });
+  document.getElementById('cats').innerHTML=html;
+}
+
+function renderList(cat){
+  cat=cat||activeCat;
+  var filtered=cat==='all'?PLACES:PLACES.filter(function(p){return p.cat===cat});
+  var catsGroup={};
+  filtered.forEach(function(p){
+    if(!catsGroup[p.cat]){
+      catsGroup[p.cat]={label:CATEGORIES.find(function(c){return c.key===p.cat}).label,items:[]};
+    }
+    catsGroup[p.cat].items.push(p);
+  });
+  var html='';
+  Object.values(catsGroup).forEach(function(g){
+    html+='<div style="font-size:11px;color:#999;padding:8px 8px 0;font-weight:600">'+g.label+'</div>';
+    g.items.forEach(function(p){
+      html+='<div class="list-item" data-lng="'+p.lng+'" data-lat="'+p.lat+'"><div class="list-icon" style="background:#e6f4ff">'+p.icon+'</div><div class="list-info"><div class="name">'+p.name+'</div><div class="desc">'+p.desc+'</div></div><div class="list-arrow">›</div></div>';
+    });
+  });
+  document.getElementById('list').innerHTML=html;
+}
+
+function bindEvents(){
+  document.getElementById('cats').addEventListener('click',function(e){
+    var btn=e.target.closest('.cat');
+    if(!btn)return;
+    activeCat=btn.dataset.cat;
+    renderCats();renderMarkers();renderList();
+  });
+
+  document.getElementById('list').addEventListener('click',function(e){
+    var item=e.target.closest('.list-item');
+    if(!item)return;
+    var lng=parseFloat(item.dataset.lng),lat=parseFloat(item.dataset.lat);
+    map.panTo(new BMap.Point(lng,lat));
+    map.setZoom(18);
+  });
+
+  var sheet=document.getElementById('sheet'), showing=true;
+  document.getElementById('toggleBtn').addEventListener('click',function(){
+    showing=!showing;
+    sheet.classList.toggle('hidden',!showing);
+    this.textContent=showing?'☰':'▼';
+  });
+
+  document.getElementById('routeBtn').addEventListener('click',function(){
+    document.getElementById('routePanel').classList.add('show');
+    document.getElementById('overlay').classList.add('show');
+  });
+
+  document.getElementById('overlay').addEventListener('click',closeRoute);
+
+  // 搜索回车
+  document.getElementById('searchInput').addEventListener('keydown',function(e){
+    if(e.key==='Enter')doSearch();
+  });
+}
+
+function closeRoute(){
+  document.getElementById('routePanel').classList.remove('show');
+  document.getElementById('overlay').classList.remove('show');
+}
+
+function showLoading(v){
+  document.getElementById('loading').style.display=v?'block':'none';
+}
+
+// ===== API 调用（通过本地代理） =====
+async function callAPI(endpoint, params){
+  var url='/api/'+endpoint;
+  if(params){
+    var qs=Object.entries(params).map(function(kv){return encodeURIComponent(kv[0])+'='+encodeURIComponent(kv[1])}).join('&');
+    url+='?'+qs;
+  }
+  var resp=await fetch(url);
+  if(!resp.ok)throw new Error('API error: '+resp.status);
+  return resp.json();
+}
+
+// ===== AI 搜索 =====
+function fuzzyMatch(query){
+  query=query.toLowerCase();
+  return PLACES.filter(function(p){
+    return p.name.toLowerCase().indexOf(query)>-1 || p.desc.toLowerCase().indexOf(query)>-1;
+  });
+}
+
+async function doSearch(){
+  var q=document.getElementById('searchInput').value.trim();
+  if(!q)return;
+
+  // 先本地匹配
+  var local=fuzzyMatch(q);
+  if(local.length>0){
+    activeCat='all';renderCats();
+    markers.forEach(function(m){map.removeOverlay(m)});
+    markers=[];markerMap={};
+    local.forEach(function(p){
+      var m=createMarker(p);
+      map.addOverlay(m);markers.push(m);markerMap[p.name]=p;
+    });
+    renderList();
+    // 定位到第一个
+    map.panTo(new BMap.Point(local[0].lng,local[0].lat));
+    map.setZoom(18);
+    return;
+  }
+
+  // AI 搜索
+  showLoading(true);
+  try{
+    var data=await callAPI('place',{
+      user_raw_request:'保定学院 '+q,
+      region:'保定市'
+    });
+    showLoading(false);
+    if(data.results&&data.results.length>0){
+      // 在地图上展示结果
+      markers.forEach(function(m){map.removeOverlay(m)});
+      markers=[];var bounds=[];
+      data.results.forEach(function(r,i){
+        if(!r.location)return;
+        var pt=new BMap.Point(r.location.lng,r.location.lat);
+        bounds.push(pt);
+        var m=new BMap.Marker(pt);
+        m.addEventListener('click',function(){
+          var info='<div style="padding:6px 2px;min-width:140px"><b style="font-size:13px">'+r.name+'</b><br><span style="font-size:11px;color:#666">'+r.address+'</span></div>';
+          map.openInfoWindow(new BMap.InfoWindow(info,{width:200}),pt);
+        });
+        map.addOverlay(m);markers.push(m);
+      });
+      if(bounds.length>0){
+        map.setViewport(bounds);
+      }
+    }else{
+      alert('未找到相关结果');
+    }
+  }catch(e){
+    showLoading(false);
+    alert('搜索失败: '+e.message);
+  }
+}
+
+// ===== 路线规划 =====
+async function doRoute(){
+  var from=document.getElementById('fromInput').value.trim();
+  var to=document.getElementById('toInput').value.trim();
+  if(!from||!to){alert('请填写起点和终点');return}
+
+  showLoading(true);
+  try{
+    var data=await callAPI('direction',{
+      user_raw_request:'从'+from+'到'+to,
+      region:'保定市',
+      mode:'walking'
+    });
+    showLoading(false);
+
+    var html='';
+    if(data.routes&&data.routes[0]&&data.routes[0].steps){
+      html+='<div style="font-weight:700;margin-bottom:8px">🚶 '+data.routes[0].distance+' · '+data.routes[0].duration+'</div>';
+      data.routes[0].steps.forEach(function(s,i){
+        html+='<div class="step"><span class="icon">'+(i+1)+'</span>'+s.instruction+'</div>';
+      });
+    }else if(data.message){
+      html='<div>'+data.message+'</div>';
+    }else{
+      html='<div>路线规划中，请在地图查看...</div>';
+
+      // 在地图上画线
+      var fromP=markerMap[from]||null;
+      var toP=markerMap[to]||null;
+      if(fromP&&toP){
+        var poly=new BMap.Polyline([
+          new BMap.Point(fromP.lng,fromP.lat),
+          new BMap.Point(toP.lng,toP.lat)
+        ],{strokeColor:'#1677ff',strokeWeight:3,strokeOpacity:.7});
+        map.addOverlay(poly);
+        map.setViewport([
+          new BMap.Point(fromP.lng,fromP.lat),
+          new BMap.Point(toP.lng,toP.lat)
+        ]);
+      }
+    }
+    document.getElementById('routeResult').innerHTML=html;
+  }catch(e){
+    showLoading(false);
+    // 本地路线回退
+    var fromP=markerMap[from];
+    var toP=markerMap[to];
+    if(fromP&&toP){
+      var poly=new BMap.Polyline([
+        new BMap.Point(fromP.lng,fromP.lat),
+        new BMap.Point(toP.lng,toP.lat)
+      ],{strokeColor:'#1677ff',strokeWeight:3,strokeOpacity:.7});
+      map.addOverlay(poly);
+      map.setViewport([
+        new BMap.Point(fromP.lng,fromP.lat),
+        new BMap.Point(toP.lng,toP.lat)
+      ]);
+      document.getElementById('routeResult').innerHTML='<div>已在地图上显示从 <b>'+from+'</b> 到 <b>'+to+'</b> 的直线路线</div>';
+    }else{
+      document.getElementById('routeResult').innerHTML='<div>未找到校内地点，请在列表中选择</div>';
+    }
+  }
+}
+
+loadBMap(init);
+</script>
+</body>
+</html>
